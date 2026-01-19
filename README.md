@@ -172,6 +172,31 @@ pytest -m database -v
 pytest -m load -v
 ```
 
+---
+
+## CI/CD Limitations
+
+> **Important:** Chaos and container-restart tests are intentionally **excluded** from GitHub Actions CI.
+
+**Why?**
+- Require privileged Docker daemon access
+- Need to kill and restart containers
+- Designed for local or dedicated chaos engineering environments
+
+**CI Pipeline Scope:**
+
+**Included in CI:**
+- Database resilience tests (`test_database.py`)
+- Functional API tests
+
+**Excluded from CI:**
+- Container restart tests (`test_recovery.py`)
+- Chaos load tests (`test_chaos_load.py`)
+
+**Local execution** remains the primary testing environment for this project.
+
+---
+
 ## Challenges & Lessons Learned
 
 ### 1. Docker Compose Configuration
@@ -345,5 +370,4 @@ asyncio_mode = strict
 **Artur Dmytriyev** - QA Automation Engineer
 
 [![GitHub](https://img.shields.io/badge/GitHub-arturdmt--alt-black?logo=github)](https://github.com/arturdmt-alt)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue?logo=linkedin)](https://www.linkedin.com/in/your-profile)
-
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue?logo=linkedin)](https://www.linkedin.com/in/arturdmytriyev)
