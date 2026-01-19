@@ -8,12 +8,19 @@ TC_007 – State persistence
 
 import asyncio
 import logging
+import os
 import pytest
 
 logger = logging.getLogger("pytest-recovery")
 
 FASTAPI_CONTAINER = "recovery_fastapi"
 POSTGRES_CONTAINER = "recovery_postgres"
+
+# Skip chaos tests in CI environment
+pytestmark = pytest.mark.skipif(
+    os.getenv("CI") == "true",
+    reason="Docker container restart tests require Docker Compose (local only)",
+)
 
 
 # ------------------------------------------------------------------------------
@@ -167,3 +174,4 @@ async def test_state_persistence_after_restart(
     response = await async_client.get("/users/")
     assert response.status_code == 200
     assert len(response.json()) == 10
+    
