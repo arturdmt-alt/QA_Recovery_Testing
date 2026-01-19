@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:15-alpine
@@ -20,47 +20,81 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
+    env:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/recovery_db
+      BASE_URL: http://localhost:8000
+      PYTHONUNBUFFERED: 1
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Run recovery tests
-      run: |
-        pytest tests/test_recovery.py -v
-      env:
-        DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/recovery_db
-    
-    - name: Run database tests
-      run: |
-        pytest tests/test_database.py -v
-      env:
-        DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/recovery_db
-    
-    - name: Generate HTML report
-      if: always()
-      run: |
-        pytest tests/test_recovery.py tests/test_database.py --html=reports/test_report.html --self-contained-html
-      env:
-        DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/recovery_db
-    
-    - name: Upload test report
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-report
-        path: reports/test_report.html
-        
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # -------------------------
+      # Start FastAPI application
+      # -------------------------
+      - name: Start FastAPI
+        run: |
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+      
+      # -------------------------
+      # Wait until API is healthy
+      # -------------------------
+      - name: Wait for API healthcheck
+        run: |
+          echo "Waiting for FastAPI to become healthy..."
+          for i in {1..20}; do
+            if curl -s http://localhost:8000/health; then
+              echo "FastAPI is healthy"
+              break
+            fi
+            sleep 3
+          done
+
+      # -------------------------
+      # Run recovery tests
+      # -------------------------
+      - name: Run recovery tests
+        run: |
+          pytest tests/test_recovery.py -v
+
+      # -------------------------
+      # Run database tests
+      # -------------------------
+      - name: Run database tests
+        run: |
+          pytest tests/test_database.py -v
+
+      # -------------------------
+      # Generate HTML report
+      # -------------------------
+      - name: Generate HTML report
+        if: always()
+        run: |
+          pytest tests/test_recovery.py tests/test_database.py \
+            --html=reports/test_report.html \
+            --self-contained-html
+
+      # -------------------------
+      # Upload report artifact
+      # -------------------------
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: reports/test_report.html
