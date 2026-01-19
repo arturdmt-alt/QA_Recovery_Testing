@@ -1,0 +1,69 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: recovery_postgres
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: recovery_db
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    ports:
+      # Exponer solo si necesitás acceder desde el host
+      - "5432:5432"
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d recovery_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - recovery_network
+
+    restart: unless-stopped
+
+
+  fastapi:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+
+    container_name: recovery_fastapi
+
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/recovery_db
+      PYTHONUNBUFFERED: "1"
+      LOG_LEVEL: INFO
+
+    ports:
+      - "8000:8000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    volumes:
+      # Hot reload / desarrollo
+      - ../app:/app/app
+
+    networks:
+      - recovery_network
+
+    restart: unless-stopped
+
+
+networks:
+  recovery_network:
+    driver: bridge
+
+
+volumes:
+  postgres_data:
+    name: recovery_postgres_data
